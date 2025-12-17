@@ -52,6 +52,14 @@ Every action behaves in a predictable and consistent way.
 
 The addon stays invisible — until it is needed.
 
+
+
+### Security Note
+
+Account credentials are stored locally using SuperWoW file storage APIs.
+Passwords are not transmitted and never leave the client environment.
+
+
 ---
 
 ## Compatibility
