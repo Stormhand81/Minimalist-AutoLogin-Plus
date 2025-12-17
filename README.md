@@ -1,57 +1,59 @@
+# Minimalist AutoLogin Plus
+
 Minimalist AutoLogin Plus focuses on simplicity, clarity, and intent.
 
 It streamlines the login process by minimizing visual noise and removing unnecessary interface elements, allowing players to move from login to character selection with speed and focus. Account panels and auxiliary buttons can be hidden entirely, resulting in a cleaner and more deliberate user experience.
 
-Beyond visual refinement, the addon enhances account and character handling logic, ensuring safer defaults, predictable behavior, and improved consistency when logging in, relogging, or returning from /logout.
+Beyond visual refinement, the addon enhances account and character handling logic, ensuring safer defaults, predictable behavior, and improved consistency when logging in, relogging, or returning from `/logout`.
 
-This addon is not about adding more —
+This addon is not about adding more —  
 it is about keeping only what truly matters.
 
-Installation
+---
 
-Download or clone the repository.
+## Installation
 
-Place the files inside your World of Warcraft directory, following this structure:
+1. Download or clone the repository.
+2. Place the files inside your World of Warcraft directory, following this structure:
 
+```text
 Data\Interface\GlueXML\GlueXML.toc
 Data\Interface\GlueXML\AutoLogin.xml
 Data\Interface\GlueXML\AutoLogin.lua
+```
 
 
 Make sure the folder structure matches exactly, otherwise the addon will not load correctly.
 
+---
 
-Key Features
+## Key Features
 
-Minimalist login screen with optional hidden account interface
+- Minimalist login screen with optional hidden account interface
+- Cleaner account and character selection flow
+- Improved character ordering and selection logic
+- Safer defaults to prevent accidental character selection
+- Reliable behavior when returning from `/logout`
+- Lightweight, efficient, and non-intrusive
+- Compatible with SuperWoW 1.4+
 
-Cleaner account and character selection flow
+---
 
-Improved character ordering and selection logic
-
-Safer defaults to prevent accidental character selection
-
-Reliable behavior when returning from /logout
-
-Lightweight, efficient, and non-intrusive
-
-Compatible with SuperWoW 1.4+
-
-Design Philosophy
+## Design Philosophy
 
 Minimalist AutoLogin Plus is built around a single principle:
 
-Less interface. More intention.
+**Less interface. More intention.**
 
-Every element that does not serve clarity is removed or silenced.
+Every element that does not serve clarity is removed or silenced.  
 Every action behaves in a predictable and consistent way.
 
 The addon stays invisible — until it is needed.
 
-Compatibility
+---
 
-Client: Turtle WoW
+## Compatibility
 
-Dependency: SuperWoW 1.4 or newer
-
-Localization: Inherits existing AutoLogin localization support
+- **Client:** Turtle WoW  
+- **Dependency:** SuperWoW 1.4 or newer  
+- **Localization:** Inherits existing AutoLogin localization support
