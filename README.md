@@ -1,10 +1,12 @@
 # Minimalist AutoLogin Plus
 
-Minimalist AutoLogin Plus focuses on simplicity, clarity, and intent.
+Minimalist AutoLogin Plus focuses on clarity, simplicity, and flow.
 
-It streamlines the login process by minimizing visual noise and removing unnecessary interface elements, allowing players to move from login to character selection with speed and focus. Account panels and auxiliary buttons can be hidden entirely, resulting in a cleaner and more deliberate user experience.
+It delivers a clean and distraction-free login screen by removing non-essential interface elements. The result is a focused entry point into the game, where visual noise is reduced to the bare minimum and attention stays exactly where it should be.
 
-Beyond visual refinement, the addon enhances account and character handling logic, ensuring safer defaults, predictable behavior, and improved consistency when logging in, relogging, or returning from `/logout`.
+The addon enables automatic login without the need to manually type account credentials, streamlining the process from launch to character selection.
+
+At the character selection screen, it also allows characters to be reordered directly in the list, giving players full control over how their characters are organized and accessed.
 
 This addon is not about adding more —  
 it is about keeping only what truly matters.
