@@ -54,10 +54,11 @@ The addon stays invisible — until it is needed.
 
 
 
-### Security Note
+### Security & Storage
 
-Account credentials are stored locally using SuperWoW file storage APIs.
-Passwords are not transmitted and never leave the client environment.
+Login data is stored locally in the file `Imports/logins.txt` using SuperWoW storage.
+Credentials never leave the client and are not transmitted to any server.
+
 
 
 ---
