@@ -7,6 +7,20 @@ Beyond visual refinement, the addon enhances account and character handling logi
 This addon is not about adding more —
 it is about keeping only what truly matters.
 
+Installation
+
+Download or clone the repository.
+
+Place the files inside your World of Warcraft directory, following this structure:
+
+Data\Interface\GlueXML\GlueXML.toc
+Data\Interface\GlueXML\AutoLogin.xml
+Data\Interface\GlueXML\AutoLogin.lua
+
+
+Make sure the folder structure matches exactly, otherwise the addon will not load correctly.
+
+
 Key Features
 
 Minimalist login screen with optional hidden account interface
