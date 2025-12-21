@@ -19,9 +19,9 @@ This addon includes an optional setting to control the visibility of server-side
   DISABLE_SERVER_NEWS = true
 
 - To re-enable the NEWS panel, set it to:
-```
+  ```
   DISABLE_SERVER_NEWS = true
-```
+  ```
 ---
 
 ## Installation
