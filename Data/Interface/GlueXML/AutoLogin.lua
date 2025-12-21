@@ -98,6 +98,9 @@ LoginManager.char_buttons_locked = true
 -- NEW: flag to hide account panel and related buttons
 LoginManager.HIDE_ACCOUNT_UI = true
 
+
+-- Optional: disable server NEWS / alerts on login screen
+DISABLE_SERVER_NEWS = true
 --------
 -- utils
 --------
@@ -221,6 +224,23 @@ function LoginManager:HideSideButtons()
   }
   for _,frame in ipairs(hide_frames) do
     if _G[frame] then _G[frame]:Hide() end
+  end
+
+  -- ensure NEWS/ServerAlert never reappears (server may force-show it)
+  self:KillServerAlert()
+
+end
+
+
+function LoginManager:KillServerAlert()
+  if not DISABLE_SERVER_NEWS then return end
+  local f = _G["ServerAlertFrame"]
+  if f and not f.__autologin_killed then
+    f:Hide()
+    f.Show = function() end
+    if f.SetAlpha then f:SetAlpha(0) end
+    if f.EnableMouse then f:EnableMouse(false) end
+    f.__autologin_killed = true
   end
 end
 
@@ -405,6 +425,7 @@ function LoginManager:UpdateUI()
   if AccountLoginUI:IsVisible() then
     self:MakeExtraAccountButtons()
     self:HideSideButtons()
+    self:KillServerAlert()
     AccountLoginSaveAccountName:Hide()
     self:UpdateLoginUI()
   elseif CharacterSelectUI:IsVisible() then
@@ -781,6 +802,9 @@ AccountLogin_OnShow = function (a1,a2,a3,a4,a5,a6,a7,a8,a9)
   -- reinforce hiding immediately after show (prevents flicker)
   if LoginManager.HIDE_ACCOUNT_UI then
     LoginManager:HideAccountUI()
+
+  -- keep Server NEWS/Alert hidden even if server forces it to show
+  LoginManager:KillServerAlert()
   end
 end
 
