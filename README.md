@@ -11,15 +11,15 @@ At the character selection screen, it also allows characters to be reordered dir
 This addon is not about adding more —  
 it is about keeping only what truly matters.
 
-**Important:** This addon includes an optional setting to control the visibility of server-side NEWS / alerts on the login screen.
+**Important:** This addon includes an optional setting to control the visibility of server-side NEWS / alerts on the login screen (default is false).
 
 - To **show** the NEWS panel, set:
   ```
   ENABLE_SERVER_NEWS = true
   
-To hide the NEWS panel, set:
+- To hide the NEWS panel, set:
   ```
-ENABLE_SERVER_NEWS = false
+  ENABLE_SERVER_NEWS = false
   ```
 ---
 
