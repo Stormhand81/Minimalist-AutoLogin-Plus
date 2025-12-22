@@ -99,8 +99,10 @@ LoginManager.char_buttons_locked = true
 LoginManager.HIDE_ACCOUNT_UI = true
 
 
--- Optional: disable server NEWS / alerts on login screen
-DISABLE_SERVER_NEWS = true
+-- Optional: show server NEWS / alerts on login screen
+ENABLE_SERVER_NEWS = false
+-- Optional: restore password field automatically if login fails/disconnects
+RESTORE_PASSWORD_ON_FAIL = true
 --------
 -- utils
 --------
@@ -223,7 +225,11 @@ function LoginManager:HideSideButtons()
     "ServerAlertFrame",
   }
   for _,frame in ipairs(hide_frames) do
-    if _G[frame] then _G[frame]:Hide() end
+    if frame == "ServerAlertFrame" and ENABLE_SERVER_NEWS then
+      -- user wants NEWS visible
+    else
+      if _G[frame] then _G[frame]:Hide() end
+    end
   end
 
   -- ensure NEWS/ServerAlert never reappears (server may force-show it)
@@ -233,9 +239,38 @@ end
 
 
 function LoginManager:KillServerAlert()
-  if not DISABLE_SERVER_NEWS then return end
   local f = _G["ServerAlertFrame"]
-  if f and not f.__autologin_killed then
+  if not f then return end
+
+  -- If NEWS is enabled, restore original behavior (if we previously suppressed it)
+  if ENABLE_SERVER_NEWS then
+    if f.__autologin_origShow then
+      f.Show = f.__autologin_origShow
+    end
+    if f.__autologin_origAlpha and f.SetAlpha then
+      f:SetAlpha(f.__autologin_origAlpha)
+    elseif f.SetAlpha then
+      f:SetAlpha(1)
+    end
+    if f.__autologin_origMouse ~= nil and f.EnableMouse then
+      f:EnableMouse(f.__autologin_origMouse)
+    end
+    f.__autologin_killed = nil
+    return
+  end
+
+  -- Otherwise, suppress it (server may force-show it)
+  if not f.__autologin_killed then
+    if not f.__autologin_origShow then
+      f.__autologin_origShow = f.Show
+    end
+    if f.GetAlpha and not f.__autologin_origAlpha then
+      f.__autologin_origAlpha = f:GetAlpha()
+    end
+    if f.IsMouseEnabled and f.__autologin_origMouse == nil then
+      f.__autologin_origMouse = f:IsMouseEnabled()
+    end
+
     f:Hide()
     f.Show = function() end
     if f.SetAlpha then f:SetAlpha(0) end
@@ -243,6 +278,22 @@ function LoginManager:KillServerAlert()
     f.__autologin_killed = true
   end
 end
+
+
+function LoginManager:RestorePasswordFromSelected()
+  if not RESTORE_PASSWORD_ON_FAIL then return end
+  if not self.SelectedAcct or not (self.State and self.State.accounts and self.State.accounts[self.SelectedAcct]) then return end
+  local pwd = self.State.accounts[self.SelectedAcct].password
+  if not pwd then return end
+  -- only restore if field is currently empty (avoid overwriting user edits)
+  if AccountLoginPasswordEdit and AccountLoginPasswordEdit.GetText and AccountLoginPasswordEdit.SetText then
+    local cur = AccountLoginPasswordEdit:GetText()
+    if not cur or cur == "" then
+      AccountLoginPasswordEdit:SetText(string.sub(pwd, 2))
+    end
+  end
+end
+
 
 function LoginManager:MakeExtraAccountButtons()
   -- mantém up/down/char nos itens da lista (inofensivos mesmo ocultando o painel)
@@ -788,6 +839,18 @@ local orig_AccountLogin_OnLoad = AccountLogin_OnLoad
 AccountLogin_OnLoad = function (a1,a2,a3,a4,a5,a6,a7,a8,a9)
   if orig_AccountLogin_OnLoad then orig_AccountLogin_OnLoad(a1,a2,a3,a4,a5,a6,a7,a8,a9) end
   LoginManager:LoadAccounts()
+end
+
+
+local orig_AccountLogin_OnEvent = AccountLogin_OnEvent
+AccountLogin_OnEvent = function (a1,a2,a3,a4,a5,a6,a7,a8,a9)
+  if orig_AccountLogin_OnEvent then orig_AccountLogin_OnEvent(a1,a2,a3,a4,a5,a6,a7,a8,a9) end
+
+  -- If login fails or server disconnects, the client clears the password field immediately.
+  -- Restore it (optionally) so the user can retry without relogging/restarting.
+  if event == "LOGIN_FAILED" or event == "AUTH_FAILED" or event == "DISCONNECTED_FROM_SERVER" or event == "SERVER_DISCONNECTED" then
+    LoginManager:RestorePasswordFromSelected()
+  end
 end
 
 local orig_AccountLogin_OnShow = AccountLogin_OnShow
