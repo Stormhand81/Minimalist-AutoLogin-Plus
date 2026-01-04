@@ -6,6 +6,9 @@ It delivers a clean and distraction-free login screen by removing non-essential 
 
 The addon enables automatic login without the need to manually type account credentials, streamlining the process from launch to character selection.
 
+For users with multiple accounts, the login experience is further enhanced with a smart username autocomplete system:
+typing the first letter of a saved account name automatically completes the matching username and prepares the login flow instantly, without adding buttons or visual clutter.
+
 At the character selection screen, it also allows characters to be reordered directly in the list, giving players full control over how their characters are organized and accessed.
 
 This addon is not about adding more —  
@@ -43,6 +46,8 @@ Make sure the folder structure matches exactly, otherwise the addon will not loa
 
 - Minimalist login screen with optional hidden account interface
 - Cleaner account and character selection flow
+- Smart username autocomplete by first letter for saved accounts
+- Faster multi-account login without additional UI elements
 - Improved character ordering and selection logic
 - Safer defaults to prevent accidental character selection
 - Reliable behavior when returning from `/logout`
