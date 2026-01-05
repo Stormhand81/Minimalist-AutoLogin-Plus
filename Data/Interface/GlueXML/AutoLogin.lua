@@ -104,11 +104,11 @@ ENABLE_SERVER_NEWS = false
 -- Optional: restore password field automatically if login fails/disconnects
 RESTORE_PASSWORD_ON_FAIL = true
 
--- NEW: Autocomplete by first character in the username field.
--- If the user types a single character, we'll try to match a saved account
--- starting with that character, fill the account name, and fill the password
--- for that account.
+-- Optional: autocomplete usernames from saved accounts when the user starts typing.
+-- This is primarily meant for multi-account users.
 AUTOLOGIN_AUTOCOMPLETE_BY_LETTER = true
+-- Optional: auto-fill the password for the selected/matched account.
+-- WARNING: This addon stores account data locally; enable at your own risk.
 AUTOLOGIN_AUTOFILL_PASSWORD_ON_AUTOCOMPLETE = true
 --------
 -- utils
@@ -465,6 +465,8 @@ function LoginManager:SelectAccount(idx)
   local pwd = self.State.accounts[i].password
   AccountLoginAccountEdit:SetText(act)
   AccountLoginPasswordEdit:SetText(string.sub(pwd,2))
+  -- arm smart-replace: next typed character can replace this prefilled value
+  LoginManager.__smart_replace_armed = true
   LoginManager:OnNameUpdate(act)
 end
 
@@ -479,77 +481,167 @@ function LoginManager:OnNameUpdate(name)
   self:UpdateUI()
 end
 
--- NEW: Find best matching account index for a typed prefix.
--- Preference order:
--- 1) last-used account (State.last) if it matches
--- 2) first account in list that matches
-function LoginManager:FindAccountByPrefix(prefix)
-  if not prefix or prefix == "" then return nil end
-  if not (self.State and self.State.accounts) then return nil end
+--============================================================
+-- Username autocomplete helpers
+--
+-- Fix for ambiguous prefixes:
+-- - Do NOT auto-pick a random account when multiple matches exist.
+-- - If the user types more characters and the prefix becomes unique,
+--   we can fill the password (and optionally complete the username).
+-- - If the user types an exact saved username, always fill the password.
+--============================================================
 
+
+-- Normalize account strings (Lua 5.0 safe): trims whitespace and strips leading ':' if present.
+function LoginManager:NormalizeAccountString(str)
+  if not str then return "" end
+  -- trim
+  str = string.gsub(str, "^%s+", "")
+  str = string.gsub(str, "%s+$", "")
+  -- some setups may store account names with a leading ':' (similar to password), strip it
+  str = string.gsub(str, "^:+", "")
+  return str
+end
+
+function LoginManager:FindMatchesByPrefix(prefix)
+  if not prefix or prefix == "" then return {} end
+  if not self.State or not self.State.accounts then return {} end
+
+  prefix = self:NormalizeAccountString(prefix)
   local p = string.lower(prefix)
+  local matches = {}
 
-  -- Prefer last-used if it matches
-  if self.State.last and self.State.accounts[self.State.last] and self.State.accounts[self.State.last].account then
-    local a = self.State.accounts[self.State.last].account
-    if string.lower(string.sub(a, 1, string.len(p))) == p then
-      return self.State.last
+  -- Use pairs() for Lua 5.0 compatibility with non-sequential tables.
+  for i, acct in pairs(self.State.accounts) do
+    if type(i) == "number" and acct and acct.account then
+      local a = self:NormalizeAccountString(acct.account)
+      if a and string.lower(string.sub(a, 1, string.len(p))) == p then
+        table.insert(matches, i)
+      end
     end
   end
 
-  for i = 1, table.getn(self.State.accounts) do
-    local a = self.State.accounts[i] and self.State.accounts[i].account
-    if a and string.lower(string.sub(a, 1, string.len(p))) == p then
-      return i
+  -- Keep selection stable/deterministic
+  table.sort(matches)
+
+  return matches
+end
+
+
+function LoginManager:FindExactAccount(name)
+  if not name or name == "" then return nil end
+  if not self.State or not self.State.accounts then return nil end
+
+  local n = string.lower(name)
+
+  for i, acct in pairs(self.State.accounts) do
+    if type(i) == "number" and acct and acct.account then
+      local a = acct.account
+      if a and string.lower(a) == n then
+        return i
+      end
     end
   end
+
   return nil
 end
 
--- NEW: Autocomplete handler invoked from the username EditBox OnTextChanged.
--- If the user typed exactly 1 character, attempt to fill username and matching password.
-function LoginManager:TryAutocompleteFromUsernameField(typed)
+
+function LoginManager:FillPasswordForIndex(idx)
+  if not AUTOLOGIN_AUTOFILL_PASSWORD_ON_AUTOCOMPLETE then return end
+  if not idx or not self.State or not self.State.accounts or not self.State.accounts[idx] then return end
+  local pwd = self.State.accounts[idx].password
+  if pwd and pwd ~= "" then
+    -- Stored format has a leading ':'
+    AccountLoginPasswordEdit:SetText(string.sub(pwd, 2))
+  end
+end
+
+function LoginManager:TryAutocompleteFromUsernameField(typed, isUserInput)
   if not AUTOLOGIN_AUTOCOMPLETE_BY_LETTER then return end
   if self.__autocomplete_lock then return end
+  if isUserInput == false then return end
   if not typed or typed == "" then return end
 
-  -- Only trigger on a single character to avoid fighting normal typing.
-  if string.len(typed) ~= 1 then return end
+  typed = self:NormalizeAccountString(typed)
 
-  -- Ignore whitespace
+  -- Ignore whitespace-only input
   if typed == " " or typed == "\t" or typed == "\n" or typed == "\r" then return end
 
-  local idx = self:FindAccountByPrefix(typed)
-  if not idx then return end
-
-  local acct = self.State.accounts[idx]
-  if not acct or not acct.account then return end
+  local prevTyped = self.__last_username_typed
+  local isDeleting = false
+  if prevTyped and string.len(typed) < string.len(prevTyped) then
+    isDeleting = true
+  end
 
   self.__autocomplete_lock = true
 
-  -- Fill username
-  if AccountLoginAccountEdit and AccountLoginAccountEdit.SetText then
-    AccountLoginAccountEdit:SetText(acct.account)
-    if AccountLoginAccountEdit.SetCursorPosition then
-      AccountLoginAccountEdit:SetCursorPosition(string.len(acct.account))
+  -- (1) Exact match: always select and fill password.
+  local exact = self:FindExactAccount(typed)
+  if exact then
+    self.SelectedAcct = exact
+    self.CurrentPage = math.floor((exact - 1) / self.PageSize)
+    self:FillPasswordForIndex(exact)
+    self:UpdateUI()
+        self.__last_username_typed = typed
+self.__autocomplete_lock = nil
+    return
+  end
+
+  -- (2) Single-character input: only autocomplete if the match is unique.
+  if string.len(typed) == 1 then
+    local matches = self:FindMatchesByPrefix(typed)
+    if table.getn(matches) == 1 then
+      local idx = matches[1]
+      local acct = self.State.accounts[idx]
+      if acct and acct.account then
+        AccountLoginAccountEdit:SetText(acct.account)
+        if AccountLoginAccountEdit.SetCursorPosition then
+          AccountLoginAccountEdit:SetCursorPosition(string.len(acct.account))
+        end
+        self.SelectedAcct = idx
+        self.CurrentPage = math.floor((idx - 1) / self.PageSize)
+        self:FillPasswordForIndex(idx)
+        self:UpdateUI()
+        if AccountLoginPasswordEdit.SetFocus then
+          AccountLoginPasswordEdit:SetFocus()
+        end
+      end
+    end
+    self.__last_username_typed = typed
+    self.__autocomplete_lock = nil
+    return
+  end
+
+  -- (3) 2+ characters: if the prefix becomes unique, select it.
+  -- If the user is typing forward (not deleting), also complete the username
+  -- so they don't have to finish typing the full name.
+  local matches = self:FindMatchesByPrefix(typed)
+  if table.getn(matches) == 1 then
+    local idx = matches[1]
+    local acct = self.State.accounts[idx]
+    if acct and acct.account then
+      self.SelectedAcct = idx
+      self.CurrentPage = math.floor((idx - 1) / self.PageSize)
+
+      -- Only complete the username when we're confident the user is typing forward.
+      if not isDeleting then
+        local full = self:NormalizeAccountString(acct.account)
+        local cur = self:NormalizeAccountString(AccountLoginAccountEdit:GetText() or "")
+        if full ~= "" and string.lower(cur) ~= string.lower(full) then
+          AccountLoginAccountEdit:SetText(full)
+          if AccountLoginAccountEdit.SetCursorPosition then
+            AccountLoginAccountEdit:SetCursorPosition(string.len(full))
+          end
+        end
+      end
+
+      self:FillPasswordForIndex(idx)
+      self:UpdateUI()
     end
   end
 
-  -- Fill password (if enabled)
-  if AUTOLOGIN_AUTOFILL_PASSWORD_ON_AUTOCOMPLETE and acct.password and AccountLoginPasswordEdit and AccountLoginPasswordEdit.SetText then
-    AccountLoginPasswordEdit:SetText(string.sub(acct.password, 2))
-  end
-
-  -- Update selection and UI
-  self.SelectedAcct = idx
-  self.CurrentPage = math.floor((idx - 1) / self.PageSize)
-  self:UpdateUI()
-
-  -- Move focus to password so user can just type/press Enter
-  if AccountLoginPasswordEdit and AccountLoginPasswordEdit.SetFocus then
-    AccountLoginPasswordEdit:SetFocus()
-  end
-
+  self.__last_username_typed = typed
   self.__autocomplete_lock = nil
 end
 
@@ -954,13 +1046,59 @@ end
 
 local orig_AccountLoginAccountEdit_OnTextChanged = AccountLoginAccountEdit:GetScript("OnTextChanged")
 AccountLoginAccountEdit:SetScript("OnTextChanged", function (a1,a2,a3,a4,a5,a6,a7,a8,a9)
+  -- disarm smart-replace as soon as the user actually edits the field
+  if a2 then LoginManager.__smart_replace_armed = nil end
+  -- First, attempt smart autocomplete/password fill (only on user input).
+  -- This prevents ambiguous 1-letter prefixes from selecting the wrong account.
+  LoginManager:TryAutocompleteFromUsernameField(this:GetText(), a2)
+
+  -- Preserve original behavior.
   orig_AccountLoginAccountEdit_OnTextChanged(a1,a2,a3,a4,a5,a6,a7,a8,a9)
-
-  -- NEW: autocomplete-by-letter (and optional password fill) when user types a single character
-  LoginManager:TryAutocompleteFromUsernameField(this:GetText())
-
-  -- keep the normal selection logic synced
   LoginManager:OnNameUpdate(this:GetText())
+end)
+
+-- Smart replace (optional UX improvement):
+-- If the field already contains text (e.g., last-used account) and the user types a
+-- single character that uniquely matches another saved account, replace the field with
+-- that character and trigger the usual autocomplete logic.
+--
+-- This helps multi-account users switch accounts without having to backspace/clear first.
+local orig_AccountLoginAccountEdit_OnChar = AccountLoginAccountEdit:GetScript("OnChar")
+AccountLoginAccountEdit:SetScript("OnChar", function(a1,a2,a3,a4,a5,a6,a7,a8,a9)
+  -- In Vanilla/Turtle, OnChar uses the global arg1 for the typed character.
+  local ch = arg1
+
+  if AUTOLOGIN_AUTOCOMPLETE_BY_LETTER and ch and string.len(ch) == 1
+     and not LoginManager.__smart_replace_lock
+     and LoginManager.__smart_replace_armed then
+
+    local current = LoginManager:NormalizeAccountString(this:GetText() or "")
+
+    -- Only smart-replace when the field was prefilled with an existing saved username.
+    -- This prevents hijacking normal typing (e.g., typing "Test..." and hitting 's').
+    local exact = LoginManager:FindExactAccount(current)
+    if exact then
+      local matchesChar = LoginManager:FindMatchesByPrefix(ch)
+      if table.getn(matchesChar) == 1 then
+        LoginManager.__smart_replace_lock = true
+        LoginManager.__smart_replace_armed = nil
+
+        AccountLoginAccountEdit:SetText(ch)
+        if AccountLoginAccountEdit.SetCursorPosition then
+          AccountLoginAccountEdit:SetCursorPosition(1)
+        end
+
+        -- Trigger normal flow (will complete username + fill password if enabled).
+        LoginManager:TryAutocompleteFromUsernameField(ch, true)
+
+        LoginManager.__smart_replace_lock = nil
+      end
+    end
+  end
+
+  if orig_AccountLoginAccountEdit_OnChar then
+    orig_AccountLoginAccountEdit_OnChar(a1,a2,a3,a4,a5,a6,a7,a8,a9)
+  end
 end)
 
 local orig_AccountLogin_Login = AccountLogin_Login
